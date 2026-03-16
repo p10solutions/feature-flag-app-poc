@@ -1,9 +1,0 @@
-@AwsAppConfig.StandardApi_HostAddress = http://localhost:5087
-
-GET {{AwsAppConfig.StandardApi_HostAddress}}/appconfig/raw
-Accept: application/json
-
-###
-
-GET {{AwsAppConfig.StandardApi_HostAddress}}/appconfig/features
-Accept: application/json

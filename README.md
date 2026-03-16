@@ -1,25 +1,87 @@
-﻿# PoC .NET + AWS AppConfig para ECS e acesso direto
+﻿# PoC .NET + AWS AppConfig
 
-Esta PoC entrega tres projetos:
+Esta PoC tem dois projetos ativos na solucao:
 
 - `AwsAppConfig.Ecs`: biblioteca reutilizavel para consumo de configuracao e feature flags do AWS AppConfig.
-- `AwsAppConfig.AgentApi`: API de exemplo usando `AWS AppConfig Agent` como sidecar no ECS.
-- `AwsAppConfig.StandardApi`: API de exemplo usando o modo padrao do AWS AppConfig Data, sem agent.
+- `AwsAppConfig.Api`: API unica de demonstracao.
 
-## O que foi melhorado na arquitetura
+## Sobre a quantidade de classes
 
-A biblioteca foi refatorada para ficar mais flexivel e aderente a boas praticas:
+Nao, nao era obrigatorio ter tantas classes para uma PoC.
 
-- `AppConfigPollingHostedService` depende de uma abstracao (`IAppConfigConfigurationSource`) em vez de depender do agent diretamente.
-- O parsing de feature flags saiu do estado em memoria e foi isolado em `AppConfigFeatureParser`.
-- A configuracao passou a explicitar o modo de conexao com `ConnectionMode = Agent | Direct`.
-- A biblioteca continua expondo contratos simples para as aplicacoes consumidoras: `IAppConfigSnapshot` e `IAppConfigFeatureManager`.
+O minimo para funcionar seria bem menor. Eu separei mais responsabilidades para manter a lib flexivel entre `Agent` e `Direct`, mas para a API de exemplo isso acabou deixando a leitura menos obvia do que deveria.
 
-Isso melhora SRP, OCP e reduz acoplamento de infraestrutura.
+Para resolver isso, a API agora foi organizada por modo de uso:
 
-## Biblioteca reutilizavel
+- `AgentController`: representa explicitamente o fluxo com `AWS AppConfig Agent`.
+- `StandardController`: representa explicitamente o fluxo no modo padrao, direto no `AWS AppConfig Data`.
 
-Registro padrao em qualquer aplicacao:
+Assim voce consegue testar e entender cada integracao olhando apenas a controller correspondente.
+
+Na biblioteca `AwsAppConfig.Ecs`, a organizacao tambem foi separada por responsabilidade:
+
+- `Agent/`: classes exclusivas do modo com AppConfig Agent.
+- `Standard/`: classes exclusivas do modo padrao, direto no AppConfig Data.
+- `Common/`: classes compartilhadas pelos dois modos, como parsing, estado em memoria e servicos compartilhados.
+- `Abstractions/`: contratos publicos expostos pela lib.
+- `Configuration/`: tipos de configuracao publica da lib.
+- `Hosting/`: classes de execucao em background.
+- `Composition/`: registro de DI e composicao da biblioteca.
+
+## Como a API funciona
+
+A API unica usa a biblioteca `AwsAppConfig.Ecs`, mas agora expõe rotas separadas por modo:
+
+### Rotas do modo Agent
+
+- `GET /agent/appconfig/raw`
+- `GET /agent/appconfig/features`
+- `GET /agent/appconfig/settings`
+- `GET /agent/simulation/home`
+- `GET /agent/simulation/checkout`
+- `GET /agent/simulation/reports`
+
+### Rotas do modo Standard
+
+- `GET /standard/appconfig/raw`
+- `GET /standard/appconfig/features`
+- `GET /standard/appconfig/settings`
+- `GET /standard/simulation/home`
+- `GET /standard/simulation/checkout`
+- `GET /standard/simulation/reports`
+
+## Regra de uso
+
+A configuracao continua sendo controlada por `AwsAppConfig:ConnectionMode`.
+
+- Se a API estiver em `Agent`, as rotas `/agent/...` funcionam e as `/standard/...` retornam `409` explicando o desencontro.
+- Se a API estiver em `Direct`, as rotas `/standard/...` funcionam e as `/agent/...` retornam `409`.
+
+Isso deixa visivel qual controller representa qual estrategia, sem precisar manter duas APIs separadas.
+
+## Configuracao base
+
+Arquivo: `AwsAppConfig.Api/appsettings.json`
+
+```json
+"AwsAppConfig": {
+  "ConnectionMode": "Agent",
+  "ApplicationIdentifier": "sample-checkout",
+  "EnvironmentIdentifier": "ecs-dev",
+  "ConfigurationProfileIdentifier": "feature-flags",
+  "AgentBaseUri": "http://localhost:2772",
+  "Region": "us-east-1",
+  "RefreshIntervalSeconds": 300
+}
+```
+
+Para usar o modo padrao sem agent:
+
+```json
+"ConnectionMode": "Direct"
+```
+
+## Registro na aplicacao
 
 ```csharp
 using AwsAppConfig.Ecs;
@@ -28,7 +90,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAwsAppConfigEcs(builder.Configuration);
 ```
 
-Consumo:
+## Consumo em servicos
 
 ```csharp
 using AwsAppConfig.Ecs;
@@ -43,22 +105,7 @@ public sealed class CheckoutService(
 }
 ```
 
-## Modo 1: uso com AWS AppConfig Agent
-
-Configuracao da API que roda no ECS com sidecar:
-
-```json
-"AwsAppConfig": {
-  "ConnectionMode": "Agent",
-  "ApplicationIdentifier": "sample-checkout",
-  "EnvironmentIdentifier": "ecs-dev",
-  "ConfigurationProfileIdentifier": "feature-flags",
-  "AgentBaseUri": "http://localhost:2772",
-  "RefreshIntervalSeconds": 300
-}
-```
-
-### Task Definition de exemplo
+## Configuracao para ECS com AppConfig Agent
 
 ```json
 {
@@ -88,12 +135,6 @@ Configuracao da API que roda no ECS com sidecar:
       "name": "sample-api",
       "image": "<sua-imagem-api>",
       "essential": true,
-      "dependsOn": [
-        {
-          "containerName": "aws-appconfig-agent",
-          "condition": "START"
-        }
-      ],
       "environment": [
         {
           "name": "AwsAppConfig__ConnectionMode",
@@ -116,6 +157,10 @@ Configuracao da API que roda no ECS com sidecar:
           "value": "http://localhost:2772"
         },
         {
+          "name": "AwsAppConfig__Region",
+          "value": "us-east-1"
+        },
+        {
           "name": "AwsAppConfig__RefreshIntervalSeconds",
           "value": "300"
         }
@@ -125,26 +170,11 @@ Configuracao da API que roda no ECS com sidecar:
 }
 ```
 
-## Modo 2: uso direto sem agent
+## Configuracao para o modo padrao sem agent
 
-Configuracao da API que consulta diretamente o AppConfigData:
+Use as mesmas variaveis, mudando apenas `ConnectionMode` para `Direct`.
 
-```json
-"AwsAppConfig": {
-  "ConnectionMode": "Direct",
-  "ApplicationIdentifier": "sample-checkout",
-  "EnvironmentIdentifier": "ecs-dev",
-  "ConfigurationProfileIdentifier": "feature-flags",
-  "Region": "us-east-1",
-  "RefreshIntervalSeconds": 300
-}
-```
-
-Nesse modo, a biblioteca abre a sessao via `StartConfigurationSession`, armazena o token internamente e consulta atualizacoes com `GetLatestConfiguration`.
-
-## IAM da Task Role ou role da aplicacao
-
-Permissao minima:
+## IAM minimo
 
 ```json
 {
@@ -162,14 +192,7 @@ Permissao minima:
 }
 ```
 
-## Exemplo de configuracao hospedada no AppConfig
-
-A biblioteca suporta:
-
-1. Documento simples com `features`.
-2. Hosted Feature Flags do AWS AppConfig lendo `values.<flag>.enabled`.
-
-Exemplo:
+## Exemplo de payload no AppConfig
 
 ```json
 {
@@ -185,48 +208,12 @@ Exemplo:
 }
 ```
 
-## Endpoints das APIs de exemplo
-
-As duas APIs expõem os mesmos endpoints:
-
-- `GET /appconfig/raw`
-- `GET /appconfig/features`
-- `GET /appconfig/settings`
-- `GET /simulation/home`
-- `GET /simulation/checkout`
-- `GET /simulation/reports`
-
-`AwsAppConfig.AgentApi` responde no modo `Agent`.
-
-`AwsAppConfig.StandardApi` responde no modo `Standard`.
-
-## Executar localmente
-
-Build da solucao:
+## Executar
 
 ```powershell
 dotnet build AwsAppConfig.Poc.sln -c Release
+dotnet run --project .\AwsAppConfig.Api\AwsAppConfig.Api.csproj
 ```
-
-Executar API com agent:
-
-```powershell
-dotnet run --project .\AwsAppConfig.AgentApi\AwsAppConfig.AgentApi.csproj
-```
-
-Executar API com acesso direto:
-
-```powershell
-dotnet run --project .\AwsAppConfig.StandardApi\AwsAppConfig.StandardApi.csproj
-```
-
-## Limites da PoC em relacao a DDD e arquitetura limpa
-
-A solucao esta mais limpa e flexivel, mas continua sendo uma PoC de infraestrutura. Ela nao tem profundidade suficiente para justificar um modelo DDD completo com agregados, value objects, dominio rico e camadas separadas de aplicacao/dominio/infrastrutura. O que faz sentido aqui e:
-
-- manter a biblioteca isolada como infraestrutura de configuracao;
-- manter as APIs de exemplo finas;
-- deixar regras de negocio reais em servicos de dominio nas aplicacoes consumidoras.
 
 ## Referencias oficiais AWS
 

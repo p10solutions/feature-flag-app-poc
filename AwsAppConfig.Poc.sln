@@ -5,9 +5,7 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AwsAppConfig.Ecs", "AwsAppConfig.Ecs\AwsAppConfig.Ecs.csproj", "{74CD37B2-32F7-4FCB-B5B6-841C11654D65}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AwsAppConfig.AgentApi", "AwsAppConfig.AgentApi\AwsAppConfig.AgentApi.csproj", "{8BDDD8D0-5F11-44DB-B870-108E2A9EBD90}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AwsAppConfig.StandardApi", "AwsAppConfig.StandardApi\AwsAppConfig.StandardApi.csproj", "{C60B00E3-6115-415F-BC74-924F76C77497}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AwsAppConfig.Api", "AwsAppConfig.Api\AwsAppConfig.Api.csproj", "{8BDDD8D0-5F11-44DB-B870-108E2A9EBD90}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -43,18 +41,6 @@ Global
 		{8BDDD8D0-5F11-44DB-B870-108E2A9EBD90}.Release|x64.Build.0 = Release|Any CPU
 		{8BDDD8D0-5F11-44DB-B870-108E2A9EBD90}.Release|x86.ActiveCfg = Release|Any CPU
 		{8BDDD8D0-5F11-44DB-B870-108E2A9EBD90}.Release|x86.Build.0 = Release|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Debug|x64.Build.0 = Debug|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Debug|x86.Build.0 = Debug|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Release|x64.ActiveCfg = Release|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Release|x64.Build.0 = Release|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Release|x86.ActiveCfg = Release|Any CPU
-		{C60B00E3-6115-415F-BC74-924F76C77497}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

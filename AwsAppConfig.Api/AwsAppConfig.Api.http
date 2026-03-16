@@ -1,0 +1,9 @@
+@AwsAppConfig.Api_HostAddress = http://localhost:5022
+
+GET {{AwsAppConfig.Api_HostAddress}}/appconfig/raw
+Accept: application/json
+
+###
+
+GET {{AwsAppConfig.Api_HostAddress}}/appconfig/features
+Accept: application/json
