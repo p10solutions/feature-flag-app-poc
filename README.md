@@ -5,18 +5,26 @@ Esta PoC tem dois projetos ativos na solucao:
 - `AwsAppConfig.Ecs`: biblioteca reutilizavel para consumo de configuracao e feature flags do AWS AppConfig.
 - `AwsAppConfig.Api`: API unica de demonstracao.
 
+## Stack
+
+- `.NET 9`
+- `ASP.NET Core Web API`
+- `AWS AppConfig Agent` e `AWS AppConfig Data`
+
 ## Sobre a quantidade de classes
 
 Nao, nao era obrigatorio ter tantas classes para uma PoC.
 
 O minimo para funcionar seria bem menor. Eu separei mais responsabilidades para manter a lib flexivel entre `Agent` e `Direct`, mas para a API de exemplo isso acabou deixando a leitura menos obvia do que deveria.
 
-Para resolver isso, a API agora foi organizada por modo de uso:
+Para resolver isso, a API agora foi organizada por modo e por responsabilidade:
 
-- `AgentController`: representa explicitamente o fluxo com `AWS AppConfig Agent`.
-- `StandardController`: representa explicitamente o fluxo no modo padrao, direto no `AWS AppConfig Data`.
+- `Agent/AgentConfigurationController`: leitura do documento, feature flags e configuracao no modo Agent.
+- `Agent/AgentBusinessController`: simulacoes de negocio protegidas por flags no modo Agent.
+- `Standard/StandardConfigurationController`: leitura do documento, feature flags e configuracao no modo Standard.
+- `Standard/StandardBusinessController`: simulacoes de negocio protegidas por flags no modo Standard.
 
-Assim voce consegue testar e entender cada integracao olhando apenas a controller correspondente.
+Assim fica facil identificar quais endpoints lidam com configuracao/observabilidade e quais usam flags para liberar ou bloquear fluxos de negocio.
 
 Na biblioteca `AwsAppConfig.Ecs`, a organizacao tambem foi separada por responsabilidade:
 
@@ -30,25 +38,31 @@ Na biblioteca `AwsAppConfig.Ecs`, a organizacao tambem foi separada por responsa
 
 ## Como a API funciona
 
-A API unica usa a biblioteca `AwsAppConfig.Ecs`, mas agora expõe rotas separadas por modo:
+A API unica usa a biblioteca `AwsAppConfig.Ecs`, mas agora expõe rotas separadas por modo e por intencao:
 
-### Rotas do modo Agent
+### Rotas Agent de configuracao
 
-- `GET /agent/appconfig/raw`
-- `GET /agent/appconfig/features`
-- `GET /agent/appconfig/settings`
-- `GET /agent/simulation/home`
-- `GET /agent/simulation/checkout`
-- `GET /agent/simulation/reports`
+- `GET /agent/configuration/raw`
+- `GET /agent/configuration/features`
+- `GET /agent/configuration/settings`
 
-### Rotas do modo Standard
+### Rotas Agent de negocio
 
-- `GET /standard/appconfig/raw`
-- `GET /standard/appconfig/features`
-- `GET /standard/appconfig/settings`
-- `GET /standard/simulation/home`
-- `GET /standard/simulation/checkout`
-- `GET /standard/simulation/reports`
+- `GET /agent/business/home`
+- `GET /agent/business/checkout`
+- `GET /agent/business/reports`
+
+### Rotas Standard de configuracao
+
+- `GET /standard/configuration/raw`
+- `GET /standard/configuration/features`
+- `GET /standard/configuration/settings`
+
+### Rotas Standard de negocio
+
+- `GET /standard/business/home`
+- `GET /standard/business/checkout`
+- `GET /standard/business/reports`
 
 ## Regra de uso
 
@@ -56,8 +70,6 @@ A configuracao continua sendo controlada por `AwsAppConfig:ConnectionMode`.
 
 - Se a API estiver em `Agent`, as rotas `/agent/...` funcionam e as `/standard/...` retornam `409` explicando o desencontro.
 - Se a API estiver em `Direct`, as rotas `/standard/...` funcionam e as `/agent/...` retornam `409`.
-
-Isso deixa visivel qual controller representa qual estrategia, sem precisar manter duas APIs separadas.
 
 ## Configuracao base
 
