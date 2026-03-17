@@ -11,8 +11,7 @@ namespace AwsAppConfig.Api.Controllers.Agent;
 [ApiController]
 [Route("agent/business")]
 public sealed class AgentBusinessController(
-    IAppConfigFeatureManager featureManager,
-    IAppConfigSnapshot snapshot,
+    IAppConfigReader reader,
     IOptions<AwsAppConfigOptions> options) : ControllerBase
 {
     /// <summary>
@@ -22,7 +21,7 @@ public sealed class AgentBusinessController(
     [ProducesResponseType(typeof(HomeSimulationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     [ProducesResponseType(typeof(ApiMessageResponse), StatusCodes.Status409Conflict)]
-    public ActionResult<HomeSimulationResponse> GetHome()
+    public async Task<ActionResult<HomeSimulationResponse>> GetHome(CancellationToken cancellationToken)
     {
         var modeCheck = EnsureMode();
         if (modeCheck is not null)
@@ -30,7 +29,9 @@ public sealed class AgentBusinessController(
             return modeCheck;
         }
 
-        if (featureManager.IsEnabled("maintenance-mode"))
+        var features = await reader.GetFeaturesAsync(cancellationToken);
+
+        if (features.TryGetValue("maintenance-mode", out var maintenanceMode) && maintenanceMode)
         {
             return Problem(
                 title: "Aplicacao temporariamente bloqueada",
@@ -38,13 +39,13 @@ public sealed class AgentBusinessController(
                 statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
-        var config = snapshot.Get<AppConfigDemoDocument>();
+        var config = await reader.GetAsync<AppConfigDemoDocument>(cancellationToken);
 
         return Ok(new HomeSimulationResponse
         {
             Message = config?.Settings.WelcomeMessage ?? "Home liberada.",
             CacheTtlSeconds = config?.Settings.CacheTtlSeconds ?? 60,
-            LastUpdatedAtUtc = snapshot.LastUpdatedAtUtc,
+            LastUpdatedAtUtc = reader.LastUpdatedAtUtc,
             Mode = "Agent"
         });
     }
@@ -56,7 +57,7 @@ public sealed class AgentBusinessController(
     [ProducesResponseType(typeof(FeatureSimulationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiMessageResponse), StatusCodes.Status409Conflict)]
-    public ActionResult<FeatureSimulationResponse> GetCheckout()
+    public async Task<ActionResult<FeatureSimulationResponse>> GetCheckout(CancellationToken cancellationToken)
     {
         var modeCheck = EnsureMode();
         if (modeCheck is not null)
@@ -64,7 +65,9 @@ public sealed class AgentBusinessController(
             return modeCheck;
         }
 
-        if (!featureManager.IsEnabled("checkout-v2"))
+        var features = await reader.GetFeaturesAsync(cancellationToken);
+
+        if (!features.TryGetValue("checkout-v2", out var checkoutEnabled) || !checkoutEnabled)
         {
             return Problem(
                 title: "Checkout V2 bloqueado",
@@ -76,7 +79,7 @@ public sealed class AgentBusinessController(
         {
             Feature = "checkout-v2",
             Message = "Checkout V2 liberado para consumo.",
-            LastUpdatedAtUtc = snapshot.LastUpdatedAtUtc,
+            LastUpdatedAtUtc = reader.LastUpdatedAtUtc,
             Mode = "Agent"
         });
     }
@@ -88,7 +91,7 @@ public sealed class AgentBusinessController(
     [ProducesResponseType(typeof(FeatureSimulationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiMessageResponse), StatusCodes.Status409Conflict)]
-    public ActionResult<FeatureSimulationResponse> GetReports()
+    public async Task<ActionResult<FeatureSimulationResponse>> GetReports(CancellationToken cancellationToken)
     {
         var modeCheck = EnsureMode();
         if (modeCheck is not null)
@@ -96,7 +99,9 @@ public sealed class AgentBusinessController(
             return modeCheck;
         }
 
-        if (!featureManager.IsEnabled("reports-v2"))
+        var features = await reader.GetFeaturesAsync(cancellationToken);
+
+        if (!features.TryGetValue("reports-v2", out var reportsEnabled) || !reportsEnabled)
         {
             return Problem(
                 title: "Relatorios V2 bloqueados",
@@ -108,7 +113,7 @@ public sealed class AgentBusinessController(
         {
             Feature = "reports-v2",
             Message = "Relatorios V2 liberados para este ambiente.",
-            LastUpdatedAtUtc = snapshot.LastUpdatedAtUtc,
+            LastUpdatedAtUtc = reader.LastUpdatedAtUtc,
             Mode = "Agent"
         });
     }

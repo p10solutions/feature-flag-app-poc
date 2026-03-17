@@ -28,6 +28,20 @@ public static class DependencyInjection
         services.AddSingleton<AppConfigFeatureParser>();
         services.AddSingleton<IAppConfigSnapshot, AppConfigSnapshot>();
         services.AddSingleton<IAppConfigFeatureManager, AppConfigFeatureManager>();
+        services.AddSingleton<AgentAppConfigReader>();
+        services.AddSingleton<StandardAppConfigReader>();
+        services.AddSingleton<IAppConfigReader>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<AwsAppConfigOptions>>().Value;
+
+            return options.ConnectionMode switch
+            {
+                AppConfigConnectionMode.Agent => sp.GetRequiredService<AgentAppConfigReader>(),
+                AppConfigConnectionMode.Direct => sp.GetRequiredService<StandardAppConfigReader>(),
+                _ => throw new InvalidOperationException(
+                    $"Modo de conexao AppConfig nao suportado: {options.ConnectionMode}.")
+            };
+        });
         services.AddSingleton<AgentAppConfigConfigurationSource>();
         services.AddSingleton<StandardAppConfigConfigurationSource>();
         services.AddSingleton<IAppConfigConfigurationSource>(sp =>
@@ -57,7 +71,14 @@ public static class DependencyInjection
                 : new AmazonAppConfigDataClient(RegionEndpoint.GetBySystemName(options.Region));
         });
 
-        services.AddHostedService<AppConfigPollingHostedService>();
+        var configuredOptions = configuration
+            .GetSection(sectionName)
+            .Get<AwsAppConfigOptions>();
+
+        if (configuredOptions?.ConnectionMode == AppConfigConnectionMode.Direct)
+        {
+            services.AddHostedService<AppConfigPollingHostedService>();
+        }
 
         return services;
     }

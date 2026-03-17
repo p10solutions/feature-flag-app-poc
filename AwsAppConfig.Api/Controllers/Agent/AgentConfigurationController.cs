@@ -11,8 +11,7 @@ namespace AwsAppConfig.Api.Controllers.Agent;
 [ApiController]
 [Route("agent/configuration")]
 public sealed class AgentConfigurationController(
-    IAppConfigSnapshot snapshot,
-    IAppConfigFeatureManager featureManager,
+    IAppConfigReader reader,
     IOptions<AwsAppConfigOptions> options) : ControllerBase
 {
     /// <summary>
@@ -22,7 +21,7 @@ public sealed class AgentConfigurationController(
     [ProducesResponseType(typeof(RawAppConfigResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiMessageResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiMessageResponse), StatusCodes.Status409Conflict)]
-    public ActionResult<RawAppConfigResponse> GetRaw()
+    public async Task<ActionResult<RawAppConfigResponse>> GetRaw(CancellationToken cancellationToken)
     {
         var modeCheck = EnsureMode();
         if (modeCheck is not null)
@@ -30,20 +29,22 @@ public sealed class AgentConfigurationController(
             return modeCheck;
         }
 
-        if (string.IsNullOrWhiteSpace(snapshot.RawJson))
+        var rawJson = await reader.GetRawJsonAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(rawJson))
         {
             return NotFound(new ApiMessageResponse
             {
                 Message = "Nenhuma configuracao recebida ainda do AWS AppConfig.",
-                LastUpdatedAtUtc = snapshot.LastUpdatedAtUtc,
+                LastUpdatedAtUtc = reader.LastUpdatedAtUtc,
                 Mode = options.Value.ConnectionMode.ToString()
             });
         }
 
         return Ok(new RawAppConfigResponse
         {
-            LastUpdatedAtUtc = snapshot.LastUpdatedAtUtc,
-            RawJson = snapshot.RawJson!,
+            LastUpdatedAtUtc = reader.LastUpdatedAtUtc,
+            RawJson = rawJson,
             Mode = "Agent"
         });
     }
@@ -55,7 +56,7 @@ public sealed class AgentConfigurationController(
     [ProducesResponseType(typeof(FeaturesResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiMessageResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiMessageResponse), StatusCodes.Status409Conflict)]
-    public ActionResult<FeaturesResponse> GetFeatures()
+    public async Task<ActionResult<FeaturesResponse>> GetFeatures(CancellationToken cancellationToken)
     {
         var modeCheck = EnsureMode();
         if (modeCheck is not null)
@@ -63,21 +64,21 @@ public sealed class AgentConfigurationController(
             return modeCheck;
         }
 
-        var features = featureManager.GetAll();
+        var features = await reader.GetFeaturesAsync(cancellationToken);
 
         if (features.Count == 0)
         {
             return NotFound(new ApiMessageResponse
             {
                 Message = "Configuracao ainda indisponivel ou sem feature flags reconhecidas.",
-                LastUpdatedAtUtc = snapshot.LastUpdatedAtUtc,
+                LastUpdatedAtUtc = reader.LastUpdatedAtUtc,
                 Mode = options.Value.ConnectionMode.ToString()
             });
         }
 
         return Ok(new FeaturesResponse
         {
-            LastUpdatedAtUtc = snapshot.LastUpdatedAtUtc,
+            LastUpdatedAtUtc = reader.LastUpdatedAtUtc,
             Features = features,
             Mode = "Agent"
         });
@@ -90,7 +91,7 @@ public sealed class AgentConfigurationController(
     [ProducesResponseType(typeof(SettingsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiMessageResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiMessageResponse), StatusCodes.Status409Conflict)]
-    public ActionResult<SettingsResponse> GetSettings()
+    public async Task<ActionResult<SettingsResponse>> GetSettings(CancellationToken cancellationToken)
     {
         var modeCheck = EnsureMode();
         if (modeCheck is not null)
@@ -98,21 +99,21 @@ public sealed class AgentConfigurationController(
             return modeCheck;
         }
 
-        var config = snapshot.Get<AppConfigDemoDocument>();
+        var config = await reader.GetAsync<AppConfigDemoDocument>(cancellationToken);
 
         if (config is null)
         {
             return NotFound(new ApiMessageResponse
             {
                 Message = "Configuracao ainda indisponivel ou fora do formato esperado.",
-                LastUpdatedAtUtc = snapshot.LastUpdatedAtUtc,
+                LastUpdatedAtUtc = reader.LastUpdatedAtUtc,
                 Mode = options.Value.ConnectionMode.ToString()
             });
         }
 
         return Ok(new SettingsResponse
         {
-            LastUpdatedAtUtc = snapshot.LastUpdatedAtUtc,
+            LastUpdatedAtUtc = reader.LastUpdatedAtUtc,
             Settings = config.Settings,
             Mode = "Agent"
         });

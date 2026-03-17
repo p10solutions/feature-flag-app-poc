@@ -71,6 +71,11 @@ A configuracao continua sendo controlada por `AwsAppConfig:ConnectionMode`.
 - Se a API estiver em `Agent`, as rotas `/agent/...` funcionam e as `/standard/...` retornam `409` explicando o desencontro.
 - Se a API estiver em `Direct`, as rotas `/standard/...` funcionam e as `/agent/...` retornam `409`.
 
+## Diferenca de leitura entre Agent e Standard
+
+- `Agent`: sem cache adicional na aplicacao. Cada chamada aos endpoints `agent/...` consulta o AppConfig Agent diretamente.
+- `Standard`: com polling e snapshot em memoria na aplicacao. Os endpoints `standard/...` leem do estado interno atualizado periodicamente.
+
 ## Configuracao base
 
 Arquivo: `AwsAppConfig.Api/appsettings.json`
